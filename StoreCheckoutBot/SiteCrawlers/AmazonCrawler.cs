@@ -9,8 +9,8 @@ namespace StoreCheckoutBot.SiteCrawlers
 {
     public class AmazonCrawler : PageCrawlerBase
     {
-        public AmazonCrawler(string pageUrl, string username, string password, string screenshotLocation, int screenshotWidth, int screenshotHeight, decimal maxPrice, int refreshIntervalSeconds, Browser browser, Logger logger) 
-            : base(pageUrl, username, password, screenshotLocation, screenshotWidth, screenshotHeight, maxPrice, refreshIntervalSeconds, browser, logger)
+        public AmazonCrawler(BotSettings botSettings, StoreDetails storeDetails, ProductDetails productDetails, ProductPage productPage, Browser browser, Logger logger) 
+            : base(botSettings, storeDetails, productDetails, productPage, browser, logger)
         {
 
         }
@@ -31,7 +31,7 @@ namespace StoreCheckoutBot.SiteCrawlers
                         return;
                     }
 
-                    await productPage.GoToAsync(_pageUrl);
+                    await productPage.GoToAsync(_productPage.Url);
                     if (string.IsNullOrWhiteSpace(productTitle))
                     {
                         productTitle = await (await productPage.QuerySelectorAsync("#productTitle")).EvaluateFunctionAsync<string>("element => element.innerText");
@@ -49,7 +49,7 @@ namespace StoreCheckoutBot.SiteCrawlers
                         if (availabilityElement == null)
                         {
                             // This is bizarre, dont' keep checking this page
-                            await TakeScreenshotAsync(productPage, Path.Combine(_screenshotLocation, $"no_known_availability_{DateTime.Now.Ticks}.png"));
+                            await TakeScreenshotAsync(productPage, Path.Combine(_botSettings.ScreenshotFolderLocation, $"no_known_availability_{DateTime.Now.Ticks}.png"));
                             throw new Exception($"Could not detect a price. And no info on availability. See screenshot. Killing this thread. | {taskId}");
                         }
 
@@ -57,13 +57,13 @@ namespace StoreCheckoutBot.SiteCrawlers
                         if (availabilityText.Contains("Currently unavailable"))
                             _logger.Info($"{productTitle} remains unavailable | {taskId}");
 
-                        await Task.Delay(_refreshIntervalSeconds * 1000);
+                        await Task.Delay((_productPage.RefreshIntervalSeconds + new Random().Next(-1, 1)) * 1000);
                         continue;
                     }
 
                     var currentPriceString = await priceElement.EvaluateFunctionAsync<string>("element => element.innerText");
                     _logger.Info($"{productTitle} currently priced at {currentPriceString} | {taskId}");
-                    if (decimal.TryParse(currentPriceString.Replace("$", ""), out decimal currentPrice) && currentPrice <= _maxPrice)
+                    if (decimal.TryParse(currentPriceString.Replace("$", ""), out decimal currentPrice) && currentPrice <= _productDetails.MaxPrice)
                     {
                         await productPage.BringToFrontAsync(); // For some reason I've found more success focusing on the tab when we get to this point
 
@@ -84,16 +84,16 @@ namespace StoreCheckoutBot.SiteCrawlers
                         if (finalPriceElement == null)
                         {
                             _logger.Info($"Unable to find the final price, see screenshot below. | {taskId}");
-                            await TakeScreenshotAsync(productPage, Path.Combine(_screenshotLocation, $"missing_final_price_{DateTime.Now.Ticks}.png"));
+                            await TakeScreenshotAsync(productPage, Path.Combine(_botSettings.ScreenshotFolderLocation, $"missing_final_price_{DateTime.Now.Ticks}.png"));
                             continue; // Immediately continue, don't sleep, the item is available
                         }
 
                         var finalPriceString = await finalPriceElement.EvaluateFunctionAsync<string>("element => element.innerText");
-                        if (string.IsNullOrWhiteSpace(finalPriceString) || !decimal.TryParse(finalPriceString.Trim().Replace("$", ""), out decimal finalPrice) || finalPrice > _maxPrice + 100)
+                        if (string.IsNullOrWhiteSpace(finalPriceString) || !decimal.TryParse(finalPriceString.Trim().Replace("$", ""), out decimal finalPrice) || finalPrice > _productDetails.MaxPrice + 100)
                         {
                             _logger.Warn($"Final price of {finalPriceString} was more expensive than the given MaxPrice plus a buffer of $100. See screenshot. | {taskId}");
-                            await TakeScreenshotAsync(productPage, Path.Combine(_screenshotLocation, $"final_price_discrepency_{DateTime.Now.Ticks}.png"));
-                            await Task.Delay(_refreshIntervalSeconds * 1000);
+                            await TakeScreenshotAsync(productPage, Path.Combine(_botSettings.ScreenshotFolderLocation, $"final_price_discrepency_{DateTime.Now.Ticks}.png"));
+                            await Task.Delay((_productPage.RefreshIntervalSeconds + new Random().Next(-1, 1)) * 1000);
                             continue;
                         }
 
@@ -102,21 +102,21 @@ namespace StoreCheckoutBot.SiteCrawlers
                             await productPage.ClickAsync("#submitOrderButtonId input");
                             await Task.Delay(5000);
                             _logger.Info($"Successfully purchased {productTitle}! See checkout screenshot for proof. | {taskId}");
-                            await TakeScreenshotAsync(productPage, Path.Combine(_screenshotLocation, $"purchase_successful_{DateTime.Now.Ticks}.png"));
+                            await TakeScreenshotAsync(productPage, Path.Combine(_botSettings.ScreenshotFolderLocation, $"purchase_successful_{DateTime.Now.Ticks}.png"));
                         }
 
                         return;
                     }
                     else
                     {
-                        _logger.Info($"{productTitle} too expensive, continuing | {taskId}");
-                        await Task.Delay(_refreshIntervalSeconds * 1000);
+                        _logger.Info($"{productTitle} too expensive ({currentPriceString}), continuing | {taskId}");
+                        await Task.Delay((_productPage.RefreshIntervalSeconds + new Random().Next(-1, 1)) * 1000);
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, $"An unknown exception occurred while crawling the page {_pageUrl}.");
+                _logger.Error(ex, $"An unknown exception occurred while crawling the page {_productPage.Url}.");
                 throw;
             }
         }
@@ -134,11 +134,11 @@ namespace StoreCheckoutBot.SiteCrawlers
                 await page.ClickAsync("#nav-signin-tooltip a");
                 await page.WaitForSelectorAsync("#ap_email");
                 await page.FocusAsync("#ap_email");
-                await page.Keyboard.TypeAsync(_username);
+                await page.Keyboard.TypeAsync(_storeDetails.Username);
                 await page.ClickAsync("#continue");
                 await page.WaitForSelectorAsync("#ap_password");
                 await page.FocusAsync("#ap_password");
-                await page.Keyboard.TypeAsync(_password);
+                await page.Keyboard.TypeAsync(_storeDetails.Password);
                 await page.ClickAsync("#signInSubmit");
                 await page.WaitForNavigationAsync();
 
@@ -157,7 +157,7 @@ namespace StoreCheckoutBot.SiteCrawlers
             catch (Exception ex)
             {
                 _logger.Error(ex, "Failed to login to Amazon.");
-                await page.ScreenshotAsync(Path.Combine(_screenshotLocation, $"failed_to_login_{DateTime.Now.Ticks}.png"));
+                await page.ScreenshotAsync(Path.Combine(_botSettings.ScreenshotFolderLocation, $"failed_to_login_{DateTime.Now.Ticks}.png"));
                 throw;
             }
         }
@@ -166,8 +166,8 @@ namespace StoreCheckoutBot.SiteCrawlers
         {
             await page.SetViewportAsync(new ViewPortOptions
             {
-                Width = _screenshotWidth,
-                Height = _screenshotHeight
+                Width = _botSettings.ScreenshotWidth,
+                Height = _botSettings.ScreenshotHeight
             });
 
             await page.ScreenshotAsync(fileName);

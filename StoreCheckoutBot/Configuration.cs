@@ -7,11 +7,21 @@ namespace StoreCheckoutBot
     /// </summary>
     public class Configuration
     {
+        public BotSettings BotSettings { get; set; } = new BotSettings();
+
+        /// <summary>
+        /// The list of stores to crawl
+        /// </summary>
+        public List<StoreConfig> StoreConfigs { get; set; } = new List<StoreConfig>();
+    }
+
+    public class BotSettings 
+    {
         /// <summary>
         /// Determines whether Chromium is launched in headless mode. Headless is generally faster
         /// </summary>
         public bool UseHeadlessBrowser { get; set; } = true;
-        
+
         /// <summary>
         /// The default screenshot width when taking screenshots during the crawling process 
         /// </summary>
@@ -25,12 +35,7 @@ namespace StoreCheckoutBot
         /// <summary>
         /// The filepath to the screenshot folder e.g. "C:\Screenshots"
         /// </summary>
-        public string ScreenshotFolderLocation { get; set; }
-
-        /// <summary>
-        /// The list of stores to crawl
-        /// </summary>
-        public List<StoreConfig> StoreConfigs { get; set; } = new List<StoreConfig>();
+        public string ScreenshotFolderLocation { get; set; } = ".\\CheckoutBotScreenshots";
     }
 
     /// <summary>
@@ -38,6 +43,16 @@ namespace StoreCheckoutBot
     /// </summary>
     public class StoreConfig
     { 
+        public StoreDetails StoreDetails { get; set; }
+
+        /// <summary>
+        /// A collection of products to crawl on this site
+        /// </summary>
+        public List<Product> Products { get; set; } = new List<Product>();
+    }
+
+    public class StoreDetails
+    {
         /// <summary>
         /// The name of the store. Also used to map to the login function, and site specific crawler
         /// </summary>
@@ -52,24 +67,24 @@ namespace StoreCheckoutBot
         /// Password to login to the site
         /// </summary>
         public string Password { get; set; }
-
-        /// <summary>
-        /// A collection of products to crawl on this site
-        /// </summary>
-        public List<Product> Products { get; set; } = new List<Product>();
     }
 
     public class Product
     {
-        /// <summary>
-        /// The max price you're willing to spend on this item
-        /// </summary>
-        public decimal MaxPrice { get; set; }
+        public ProductDetails ProductDetails { get; set; }
         
         /// <summary>
         /// The collection of pages for this product
         /// </summary>
         public List<ProductPage> ProductPages { get; set; }  
+    }
+
+    public class ProductDetails 
+    {
+        /// <summary>
+        /// The max price you're willing to spend on this item
+        /// </summary>
+        public decimal MaxPrice { get; set; }
     }
 
     /// <summary>

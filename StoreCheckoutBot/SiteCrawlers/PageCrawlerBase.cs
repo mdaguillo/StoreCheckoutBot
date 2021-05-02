@@ -8,26 +8,18 @@ namespace StoreCheckoutBot.SiteCrawlers
 {
     public abstract class PageCrawlerBase
     {
-        protected string _username { get; set; }
-        protected string _password { get; set; }
-        protected string _pageUrl { get; set; }
-        protected string _screenshotLocation { get; set; }
-        protected int _screenshotWidth { get; set; }
-        protected int _screenshotHeight { get; set; }
-        protected decimal _maxPrice { get; set; }
-        protected int _refreshIntervalSeconds { get; set; }
+        protected BotSettings _botSettings { get; set; }
+        protected StoreDetails _storeDetails { get; set; }
+        protected ProductDetails _productDetails { get; set; }
+        protected ProductPage _productPage { get; set; }
         protected Logger _logger { get; set; }
         protected Browser _browser { get; set; }
 
-        public PageCrawlerBase(string pageUrl, string username, string password, string screenshotLocation, int screenshotWidth, int screenshotHeight, decimal maxPrice, int refreshIntervalSeconds, Browser browser, Logger logger) {
-            _pageUrl = pageUrl;
-            _username = username;
-            _password = password;
-            _screenshotLocation = screenshotLocation;
-            _screenshotWidth = screenshotWidth;
-            _screenshotHeight = screenshotHeight;
-            _maxPrice = maxPrice;
-            _refreshIntervalSeconds = refreshIntervalSeconds;
+        public PageCrawlerBase(BotSettings botSettings, StoreDetails storeDetails, ProductDetails productDetails, ProductPage productPage, Browser browser, Logger logger) {
+            _botSettings = botSettings;
+            _storeDetails = storeDetails;
+            _productDetails = productDetails;
+            _productPage = productPage;
             _logger = logger;
             _browser = browser;
         }

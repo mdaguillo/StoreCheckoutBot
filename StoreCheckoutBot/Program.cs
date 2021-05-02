@@ -34,7 +34,7 @@ namespace StoreCheckoutBot
                 // Set up the browser
                 Browser browser = await Puppeteer.LaunchAsync(new LaunchOptions
                 {
-                    Headless = _config.UseHeadlessBrowser
+                    Headless = _config.BotSettings.UseHeadlessBrowser
                 });
 
                 var allProductCrawlers = new List<Task>();
@@ -44,15 +44,15 @@ namespace StoreCheckoutBot
                     try
                     {
                         // Verify we built page crawlers for this site
-                        var crawlerType = allCrawlerTypes.FirstOrDefault(x => x.Name == $"{store.Name}Crawler");
+                        var crawlerType = allCrawlerTypes.FirstOrDefault(x => x.Name == $"{store.StoreDetails.Name}Crawler");
                         if (crawlerType == null)
                         {
-                            _logger.Warn($"Unable to find a site crawler for the store {store.Name}. If you are sure this store is supported, please check the spelling of the store in the config file.");
+                            _logger.Warn($"Unable to find a site crawler for the store {store.StoreDetails.Name}. If you are sure this store is supported, please check the spelling of the store in the config file.");
                             continue;
                         }
 
                         // Create a stub instance for this site and login
-                        await ((PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[10] { "", store.Username, store.Password, _config.ScreenshotFolderLocation, _config.ScreenshotWidth, _config.ScreenshotHeight, (decimal)0.0, (int)0, browser, _logger })).LoginAsync();
+                        await ((PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[6] { _config.BotSettings, store.StoreDetails, null, null, browser, _logger })).LoginAsync();
 
                         // Iterate through the pages and create a crawler for each
                         foreach (var product in store.Products)
@@ -60,7 +60,7 @@ namespace StoreCheckoutBot
                             var productPageCrawlers = new List<PageCrawlerBase>();
                             foreach (var page in product.ProductPages)
                             {
-                                var pageCrawler = (PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[10] { page.Url, store.Username, store.Password, _config.ScreenshotFolderLocation, _config.ScreenshotWidth, _config.ScreenshotHeight, product.MaxPrice, page.RefreshIntervalSeconds, browser, _logger });
+                                var pageCrawler = (PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[6] { _config.BotSettings, store.StoreDetails, product.ProductDetails, page, browser, _logger });
                                 productPageCrawlers.Add(pageCrawler);
                             }
 
@@ -70,7 +70,7 @@ namespace StoreCheckoutBot
                     }
                     catch (Exception ex)
                     {
-                        _logger.Error(ex, $"An error occurred while attempting to crawl the store {store.Name}.");
+                        _logger.Error(ex, $"An error occurred while attempting to crawl the store {store.StoreDetails.Name}.");
                     }
                 }
 
