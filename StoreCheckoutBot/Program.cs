@@ -107,11 +107,6 @@ namespace StoreCheckoutBot
             }
         }
 
-        private static Task _discordClient_Log(LogMessage arg)
-        {
-            throw new NotImplementedException();
-        }
-
         /// <summary>
         /// Initializes crawling for each page passed in, and returns a Task where success indicates one of the pages was successful
         /// in purchasing a product. Once successful, it cancels the rest of the pages so as not to buy duplicates.
