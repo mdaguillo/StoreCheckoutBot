@@ -8,6 +8,8 @@ using Microsoft.Extensions.Configuration;
 using NLog.Web;
 using PuppeteerSharp;
 using StoreCheckoutBot.SiteCrawlers;
+using Discord;
+using Discord.WebSocket;
 
 namespace StoreCheckoutBot
 {
@@ -15,6 +17,9 @@ namespace StoreCheckoutBot
     {
         private static Configuration _config { get; set; } = new Configuration();
         private static NLog.Logger _logger { get; set; }
+
+        private static DiscordSocketClient _discordClient { get; set; } = new DiscordSocketClient(new DiscordSocketConfig { AlwaysDownloadUsers = true });
+        private static bool IsDiscordReady { get; set; } = false;
 
         static async Task Main(string[] args)
         {
@@ -24,6 +29,17 @@ namespace StoreCheckoutBot
                 .Bind(_config); // Map to strongly typed config object
 
             _logger = NLogBuilder.ConfigureNLog("nlog.config").GetCurrentClassLogger();
+
+            _discordClient.Log += HandleDiscordLogs; // Hook up the log event to our application logger
+            _discordClient.Ready += HandleDiscordReady;
+
+            await _discordClient.LoginAsync(TokenType.Bot, _config.BotSettings.DiscordBotToken);
+            await _discordClient.StartAsync();
+            while (!IsDiscordReady)
+            { 
+                // wait for ready event to fire
+            }
+
 
             try
             {
@@ -52,7 +68,7 @@ namespace StoreCheckoutBot
                         }
 
                         // Create a stub instance for this site and login
-                        await ((PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[6] { _config.BotSettings, store.StoreDetails, null, null, browser, _logger })).LoginAsync();
+                        await ((PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[7] { _config.BotSettings, store.StoreDetails, null, null, browser, _logger, _discordClient })).LoginAsync();
 
                         // Iterate through the pages and create a crawler for each
                         foreach (var product in store.Products)
@@ -60,7 +76,7 @@ namespace StoreCheckoutBot
                             var productPageCrawlers = new List<PageCrawlerBase>();
                             foreach (var page in product.ProductPages)
                             {
-                                var pageCrawler = (PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[6] { _config.BotSettings, store.StoreDetails, product.ProductDetails, page, browser, _logger });
+                                var pageCrawler = (PageCrawlerBase)Activator.CreateInstance(crawlerType, new object[7] { _config.BotSettings, store.StoreDetails, product.ProductDetails, page, browser, _logger, _discordClient });
                                 productPageCrawlers.Add(pageCrawler);
                             }
 
@@ -89,6 +105,11 @@ namespace StoreCheckoutBot
                 // Ensure to flush and stop internal timers/threads before application-exit (Avoid segmentation fault on Linux)
                 NLog.LogManager.Shutdown();
             }
+        }
+
+        private static Task _discordClient_Log(LogMessage arg)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -124,6 +145,18 @@ namespace StoreCheckoutBot
                 _logger.Error(ex, "An error occurred while waiting for product pages to crawl.");
                 throw ex;
             }
+        }
+
+        private static Task HandleDiscordLogs(LogMessage message)
+        {
+            _logger.Debug($"DISCORD: {message.Message}");
+            return Task.CompletedTask;
+        }
+
+        private static Task HandleDiscordReady()
+        {
+            IsDiscordReady = true;
+            return Task.CompletedTask;
         }
     }
 }

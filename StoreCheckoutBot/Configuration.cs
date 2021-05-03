@@ -36,6 +36,12 @@ namespace StoreCheckoutBot
         /// The filepath to the screenshot folder e.g. "C:\Screenshots"
         /// </summary>
         public string ScreenshotFolderLocation { get; set; } = ".\\CheckoutBotScreenshots";
+
+        public string DiscordBotToken { get; set; }
+
+        public string DiscordBotServerName { get; set; }
+
+        public string UserDiscordName { get; set; }
     }
 
     /// <summary>
