@@ -17,6 +17,7 @@ namespace StoreCheckoutBot.SiteCrawlers
         }
 
         private static object _cookieLock = new object();
+        private static Task _captchaTask = Task.CompletedTask; 
 
         public override async Task CrawlPageAsync(CancellationToken token)
         {
@@ -48,7 +49,9 @@ namespace StoreCheckoutBot.SiteCrawlers
                         if (captchaCookie != null)
                         {
                             _logger.Info($"Captcha already initiated by task {captchaCookie.Value} | {taskId}");
-                            await Task.Delay(30000); // Wait 30 seconds for the user to respond and complete the captcha
+                            if (!_captchaTask.IsCompleted) 
+                                await _captchaTask;
+                            
                             continue;
                         }
 
@@ -67,10 +70,11 @@ namespace StoreCheckoutBot.SiteCrawlers
                                 Value = taskId.ToString(),
                                 Url = basePageUri.ToString()
                             });
+
+                            _captchaTask = PromptUserForCaptcha();
                         }
 
-                        _logger.Info("Initiating captcha prompt to user. Waiting for user input.");
-                        // TODO Add discord integration to handle remote captcha completion
+                        await _captchaTask;
 
                         continue;
                     }
@@ -105,7 +109,6 @@ namespace StoreCheckoutBot.SiteCrawlers
                     }
 
                     var currentPriceString = await priceElement.EvaluateFunctionAsync<string>("element => element.innerText");
-                    _logger.Info($"{productTitle} currently priced at {currentPriceString} | {taskId}");
                     if (decimal.TryParse(currentPriceString.Replace("$", ""), out decimal currentPrice) && currentPrice <= _productDetails.MaxPrice)
                     {
                         await productPage.BringToFrontAsync(); // For some reason I've found more success focusing on the tab when we get to this point
@@ -203,6 +206,12 @@ namespace StoreCheckoutBot.SiteCrawlers
                 await page.ScreenshotAsync(Path.Combine(_botSettings.ScreenshotFolderLocation, $"failed_to_login_{DateTime.Now.Ticks}.png"));
                 throw;
             }
+        }
+
+        public async Task PromptUserForCaptcha()
+        {
+            // TODO Add discord integration to handle remote captcha completion
+            _logger.Info("Initiating captcha prompt to user. Waiting for user input.");
         }
 
         private async Task TakeScreenshotAsync(Page page, string fileName) 
